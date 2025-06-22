@@ -4,7 +4,6 @@
 
 import { useState, useRef, useCallback } from 'react';
 import ReactFlow, { Controls, Background, MiniMap } from 'reactflow';
-import { useStore } from './store';
 import { shallow } from 'zustand/shallow';
 import { InputNode } from './nodes/inputNode';
 import { LLMNode } from './nodes/llmNode';
@@ -22,28 +21,56 @@ const nodeTypes = {
   text: TextNode,
 };
 
-const selector = (state) => ({
-  nodes: state.nodes,
-  edges: state.edges,
-  getNodeID: state.getNodeID,
-  addNode: state.addNode,
-  onNodesChange: state.onNodesChange,
-  onEdgesChange: state.onEdgesChange,
-  onConnect: state.onConnect,
-});
-
-export const PipelineUI = () => {
+export const PipelineUI = ({ nodes, setNodes, edges, setEdges }) => {
     const reactFlowWrapper = useRef(null);
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
-    const {
-      nodes,
-      edges,
-      getNodeID,
-      addNode,
-      onNodesChange,
-      onEdgesChange,
-      onConnect
-    } = useStore(selector, shallow);
+
+    // Helper for unique node IDs (simple increment, or you can use a better method)
+    const nodeIdRef = useRef(0);
+    const getNodeID = (type) => {
+        nodeIdRef.current += 1;
+        return `${type}-${nodeIdRef.current}`;
+    };
+
+    const addNode = (node) => {
+        setNodes((nds) => [...nds, node]);
+    };
+
+    const onNodesChange = useCallback(
+        (changes) => {
+            setNodes((nds) => {
+                return require('reactflow').applyNodeChanges(changes, nds);
+            });
+        },
+        [setNodes]
+    );
+
+    const onEdgesChange = useCallback(
+        (changes) => {
+            setEdges((eds) => {
+                return require('reactflow').applyEdgeChanges(changes, eds);
+            });
+        },
+        [setEdges]
+    );
+
+    const onConnect = useCallback(
+        (connection) => {
+            setEdges((eds) => {
+                const { addEdge, MarkerType } = require('reactflow');
+                return addEdge(
+                    {
+                        ...connection,
+                        type: 'smoothstep',
+                        animated: true,
+                        markerEnd: { type: MarkerType.Arrow, height: '20px', width: '20px' }
+                    },
+                    eds
+                );
+            });
+        },
+        [setEdges]
+    );
 
     const getInitNodeData = (nodeID, type) => {
       let nodeData = { id: nodeID, nodeType: `${type}` };
